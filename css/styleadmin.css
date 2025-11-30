@@ -1,0 +1,417 @@
+/* --- RESET CƠ BẢN --- */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body.admin-body {
+    font-family: 'Inter', sans-serif; /* Font hiện đại hơn */
+    background-color: #f3f4f6; /* Màu nền xám nhẹ dễ chịu */
+    color: #1f2937;
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+a { text-decoration: none; transition: 0.3s; color: inherit; }
+ul { list-style: none; }
+.container { width: 95%; max-width: 1300px; margin: 0 auto; }
+.page-padding { padding: 30px 0; flex: 1; } /* Để footer luôn ở đáy */
+
+/* --- HEADER ADMIN (TOPBAR) --- */
+.admin-topbar {
+    background-color: #ffffff;
+    height: 70px;
+    border-bottom: 1px solid #e5e7eb;
+    position: sticky; /* Ghim lên đầu trang */
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03); /* Bóng đổ nhẹ */
+}
+
+/* Căn chỉnh bố cục ngang */
+.topbar-wrapper {
+    height: 100%;
+    padding-top: 10px;
+    display: flex;
+    justify-content: space-between; /* Logo trái, Menu giữa, Profile phải */
+    align-items: center;
+}
+
+/* 1. Logo Brand */
+.admin-brand a {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #111827;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    letter-spacing: 0.5px;
+}
+.admin-brand i { 
+    color: #d4af37; /* Màu vàng sang trọng */
+    font-size: 1.2rem;
+}
+
+/* 2. Menu Điều Hướng */
+.admin-menu ul { 
+    display: flex; 
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    gap: 8px; /* Khoảng cách giữa các nút menu */
+}
+
+.admin-menu a {
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    color: #6b7280; /* Màu chữ xám mặc định */
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+/* Hiệu ứng khi di chuột vào Menu */
+.admin-menu a:hover { 
+    background-color: #f9fafb; 
+    color: #d4af37; 
+}
+
+/* Trạng thái Menu đang chọn (Active) */
+.admin-menu a.active { 
+    background-color: #fffbeb; /* Nền vàng nhạt */
+    color: #d4af37; /* Chữ vàng đậm */
+}
+
+/* 3. User Profile */
+.admin-profile { 
+    display: flex; 
+    align-items: center; 
+    gap: 15px; 
+}
+
+/* Khung thông tin Admin */
+.profile-info {
+    display: flex; 
+    align-items: center; 
+    gap: 10px;
+    padding: 6px 15px 6px 6px;
+    background: #f9fafb;
+    border-radius: 30px;
+    border: 1px solid #e5e7eb;
+    transition: 0.3s;
+}
+
+.profile-info:hover {
+    border-color: #d4af37;
+    background: #fff;
+}
+
+.profile-info img { 
+    width: 32px; 
+    height: 32px; 
+    border-radius: 50%; 
+}
+
+.profile-info .user-name { 
+    font-weight: 600; 
+    font-size: 0.9rem; 
+    color: #374151;
+}
+
+/* Nút Đăng Xuất */
+.btn-logout {
+    width: 38px; 
+    height: 38px;
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    border-radius: 50%;
+    color: #ef4444; /* Màu đỏ */
+    background: #fef2f2; /* Nền đỏ nhạt */
+    transition: 0.2s;
+    text-decoration: none;
+    font-size: 1rem;
+}
+
+.btn-logout:hover { 
+    background: #dc2626; /* Nền đỏ đậm khi hover */
+    color: white; 
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(220, 38, 38, 0.2);
+}
+
+/* --- FOOTER ADMIN --- */
+.admin-footer {
+    background-color: #fff;
+    border-top: 1px solid #e5e7eb;
+    padding: 20px 0;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 0.85rem;
+    margin-top: auto;
+}
+
+/* --- CÁC CLASS CHO PHẦN NỘI DUNG CHÍNH (MAIN) --- */
+/* Dashboard Widgets */
+.dashboard-stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 30px;
+}
+.stat-card {
+    background: #fff; padding: 25px; border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    display: flex; align-items: center;
+    border: 1px solid #e5e7eb;
+}
+.stat-icon {
+    width: 50px; height: 50px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem; margin-right: 20px;
+    background: #f3f4f6; color: #4b5563;
+}
+.stat-info h3 { margin: 0; font-size: 1.8rem; font-weight: 700; color: #111827; }
+.stat-info p { margin: 0; color: #6b7280; font-size: 0.9rem; }
+
+/* Table */
+.table-card {
+    background: #fff; border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+}
+.card-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 20px; border-bottom: 1px solid #e5e7eb;
+}
+.card-title { font-size: 1.2rem; font-weight: 700; color: #111827; }
+
+.modern-table { width: 100%; border-collapse: collapse; }
+.modern-table th {
+    background-color: #f9fafb; color: #6b7280; font-weight:bold;
+    text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;
+    padding: 15px 20px; text-align: left; border-bottom: 1px solid #e5e7eb;
+}
+.modern-table td { padding: 15px 20px; border-bottom: 1px solid #e5e7eb; vertical-align: middle; }
+.modern-table tr:hover { background-color: #f9fafb; }
+
+/* Badges & Buttons */
+.badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.badge-warning { background: #fffbeb; color: #d97706; }
+.badge-success { background: #ecfdf5; color: #059669; }
+.badge-danger { background: #fef2f2; color: #dc2626; }
+
+/* --- SỬA LẠI PHẦN NÚT HÀNH ĐỘNG --- */
+
+/* 1. Tạo khung chứa các nút để dàn ngang */
+.action-group {
+    display: flex;              /* Xếp hàng ngang */
+    justify-content: center;    /* Căn giữa ô */
+    align-items: center;        /* Căn giữa theo chiều dọc */
+    gap: 8px;                   /* Khoảng cách giữa các nút là 8px */
+    white-space: nowrap;        /* Bắt buộc không xuống dòng */
+}
+
+/* 2. Cập nhật nút bấm (Bỏ margin cũ đi vì đã dùng gap) */
+.action-btn {
+    width: 32px; 
+    height: 32px; 
+    border-radius: 6px;
+    display: inline-flex; 
+    align-items: center; 
+    justify-content: center;
+    color: #fff; 
+    transition: 0.2s;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    border: none; /* Bỏ viền nếu có */
+    /* margin-right: 5px;  <-- XÓA DÒNG NÀY (Vì đã dùng gap ở trên) */
+}
+
+.action-btn:hover { 
+    transform: translateY(-2px); 
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15); 
+}
+
+/* Màu sắc nút */
+.btn-green { background: #27ae60; }
+.btn-orange { background: #f39c12; }
+.btn-red { background: #e74c3c; }
+/* =========================================
+   GIAO DIỆN LOGIN ADMIN (Thêm vào cuối file CSS)
+   ========================================= */
+body.login-body {
+    background: linear-gradient(135deg, #2c3e50, #000); /* Nền tối sang trọng */
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.login-card {
+    background: #fff;
+    width: 400px;
+    padding: 40px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    text-align: center;
+}
+
+.login-header {
+    margin-bottom: 30px;
+}
+
+.login-header h2 {
+    color: #333;
+    margin: 10px 0 5px;
+    font-weight: 700;
+}
+
+.login-header p {
+    color: #777;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.login-input {
+    width: 100%;
+    padding: 12px 15px;
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: #f9f9f9;
+    box-sizing: border-box; /* Quan trọng để không bị tràn khung */
+    transition: 0.3s;
+}
+
+.login-input:focus {
+    border-color: #d4af37;
+    background: #fff;
+    outline: none;
+}
+
+.btn-login-submit {
+    width: 100%;
+    padding: 12px;
+    background: #d4af37;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.btn-login-submit:hover {
+    background: #b5952f;
+    transform: translateY(-2px);
+}
+
+/* --- TRANG QUẢN LÝ SỐ PHÒNG (quan_ly_so_phong.php) --- */
+
+/* Nút thêm mới (Big CTA) */
+.btn-big-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background-color: #27ae60; /* Màu xanh lá */
+    color: white;
+    font-weight: 600;
+    border-radius: 8px;
+    transition: all 0.2s;
+    box-shadow: 0 4px 10px rgba(39, 174, 96, 0.2);
+}
+
+.btn-big-cta:hover {
+    background-color: #219150;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(39, 174, 96, 0.3);
+}
+
+/* --- TRANG THÊM/SỬA SỐ PHÒNG (them_so_phong.php) --- */
+
+/* Khung form */
+.form-box {
+    background: #fff;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 5px 25px rgba(0,0,0,0.05);
+    border: 1px solid #e5e7eb;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.form-header {
+    font-size: 1.5rem;
+    color: #111827;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #f3f4f6;
+    font-weight: 700;
+}
+
+/* Các nhóm input */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #374151;
+    font-size: 0.95rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+    font-family: inherit;
+    background-color: #f9fafb;
+}
+
+.form-control:focus {
+    border-color: #d4af37;
+    background-color: #fff;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+}
+
+/* Nút Submit */
+.btn-submit {
+    width: 100%;
+    padding: 14px;
+    background-color: #d4af37;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-submit:hover {
+    background-color: #b5952f;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(181, 149, 47, 0.3);
+}
+
+/* Nút Hủy (nếu có) */
+.btn-cancel {
+    background-color: #9ca3af;
+}
+.btn-cancel:hover {
+    background-color: #6b7280;
+}
