@@ -1,4 +1,6 @@
 <?php
+// File: khachhang/dat_phong.php
+
 // 1. Kết nối DB và Header
 include '../includes/ketnoidb.php';
 $tieuDeTrang = "Xác nhận đặt phòng - Khách sạn ABC";
@@ -10,7 +12,7 @@ if (!isset($_GET['id']) || empty($_GET['ngay_nhan']) || empty($_GET['ngay_tra'])
     exit;
 }
 
-// ĐÂY LÀ ID LOẠI PHÒNG (VÍ DỤ: VIP) - KHÔNG PHẢI ID PHÒNG CỤ THỂ
+// LẤY ID LOẠI PHÒNG TỪ URL
 $idLoaiPhong = (int)$_GET['id']; 
 
 $ngayNhan = $_GET['ngay_nhan'];
@@ -20,6 +22,7 @@ $soLuong = isset($_GET['so_luong']) ? (int)$_GET['so_luong'] : 1;
 // 3. Lấy thông tin GIÁ TIỀN từ bảng Loại Phòng
 $sql = "SELECT * FROM loai_phong WHERE id = $idLoaiPhong";
 $ketQua = $ketNoiDb->query($sql);
+
 if ($ketQua->num_rows == 0) {
     die("Lỗi: Loại phòng này không tồn tại.");
 }
@@ -51,53 +54,35 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $sdtKhach = $_POST['sdt_khach'];
     $emailKhach = $_POST['email_khach'];
 
-    // --- BƯỚC QUAN TRỌNG NHẤT: TÌM PHÒNG CỤ THỂ ---
-    // Tìm 1 phòng thuộc loại này mà đang Sẵn sàng
-    // (Hoặc đơn giản là lấy đại 1 phòng thuộc loại này để gán ID cho đơn hàng)
-    $sqlTimPhong = "SELECT id FROM phong 
-                    WHERE loai_phong_id = $idLoaiPhong 
-                    AND trang_thai = 'Sẵn sàng' 
-                    LIMIT 1";
+    // --- KIỂM TRA CÒN PHÒNG TRỐNG KHÔNG? (Check Logic) ---
+    // Đếm số phòng trống thuộc loại này
+    $sqlCheckSlot = "SELECT COUNT(*) as cnt FROM phong 
+                     WHERE loai_phong_id = $idLoaiPhong 
+                     AND trang_thai = 'Sẵn sàng'";
+    $rsCheck = $ketNoiDb->query($sqlCheckSlot)->fetch_assoc();
     
-    $ketQuaTimPhong = $ketNoiDb->query($sqlTimPhong);
-
-    if ($ketQuaTimPhong->num_rows > 0) {
-        // Tìm thấy phòng trống -> Lấy ID phòng thật (Ví dụ: ID 5 của phòng 101)
-        $rowPhong = $ketQuaTimPhong->fetch_assoc();
-        $idPhongThucTe = $rowPhong['id']; 
-
-        // INSERT VỚI ID PHÒNG THỰC TẾ
-        $sqlInsert = "INSERT INTO dat_phong (phong_id, so_luong, ten_khach, email_khach, sdt_khach, ngay_nhan, ngay_tra, tong_tien, trang_thai) 
-                      VALUES ('$idPhongThucTe', '$soLuong', '$tenKhach', '$emailKhach', '$sdtKhach', '$ngayNhan', '$ngayTra', '$tongTien', 'Chờ xác nhận')";
+    // Nếu số phòng trống >= số lượng khách đặt thì cho đặt
+    if ($rsCheck['cnt'] >= $soLuong) {
+        
+        // --- CÂU LỆNH INSERT ĐÃ SỬA ---
+        // Thay 'phong_id' thành 'loai_phong_id'
+        // Thay biến '$idPhongThucTe' thành '$idLoaiPhong'
+        
+        $sqlInsert = "INSERT INTO dat_phong (loai_phong_id, so_luong, ten_khach, email_khach, sdt_khach, ngay_nhan, ngay_tra, tong_tien, trang_thai) 
+                      VALUES ('$idLoaiPhong', '$soLuong', '$tenKhach', '$emailKhach', '$sdtKhach', '$ngayNhan', '$ngayTra', '$tongTien', 'Chờ xác nhận')";
         
         if ($ketNoiDb->query($sqlInsert) === TRUE) {
-            // Cập nhật trạng thái phòng đó thành 'Đang ở' (hoặc giữ nguyên chờ admin duyệt)
-            // $ketNoiDb->query("UPDATE phong SET trang_thai = 'Đang ở' WHERE id = $idPhongThucTe");
             $daDatThanhCong = true;
         } else {
             $thongBao = "<p style='color:red; text-align:center;'>Lỗi hệ thống: " . $ketNoiDb->error . "</p>";
         }
-    } else {
-        // Trường hợp không tìm thấy phòng nào 'Sẵn sàng'
-        // Giải pháp tạm thời: Lấy đại phòng đầu tiên thuộc loại này để code không bị lỗi Foreign Key
-        // (Nhưng đúng ra phải báo Hết phòng)
-        $sqlTimTam = "SELECT id FROM phong WHERE loai_phong_id = $idLoaiPhong LIMIT 1";
-        $kqTam = $ketNoiDb->query($sqlTimTam);
         
-        if ($kqTam->num_rows > 0) {
-            $r = $kqTam->fetch_assoc();
-            $idPhongThucTe = $r['id'];
-            
-            $sqlInsert = "INSERT INTO dat_phong (phong_id, so_luong, ten_khach, email_khach, sdt_khach, ngay_nhan, ngay_tra, tong_tien, trang_thai) 
-                          VALUES ('$idPhongThucTe', '$soLuong', '$tenKhach', '$emailKhach', '$sdtKhach', '$ngayNhan', '$ngayTra', '$tongTien', 'Cho_xac_nhan')";
-            if ($ketNoiDb->query($sqlInsert) === TRUE) {
-                $daDatThanhCong = true;
-            } else {
-                $thongBao = "<p style='color:red;'>Lỗi: " . $ketNoiDb->error . "</p>";
-            }
-        } else {
-            $thongBao = "<div class='alert alert-danger text-center'>Xin lỗi, loại phòng này hiện chưa được setup số phòng nào. Vui lòng liên hệ Admin.</div>";
-        }
+    } else {
+        // Hết phòng
+        $thongBao = "<div class='alert alert-danger text-center'>
+                        Rất tiếc! Hiện tại chúng tôi chỉ còn <strong>" . $rsCheck['cnt'] . "</strong> phòng trống cho loại này.
+                        <br>Vui lòng giảm số lượng hoặc chọn ngày khác.
+                     </div>";
     }
 }
 ?>
@@ -109,7 +94,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <i class="fas fa-check-circle" style="font-size: 4rem; color: #27ae60;"></i>
             <h1 class="title-success" style="color: #27ae60; margin-top: 20px;">Đặt phòng thành công!</h1>
             <p class="text-muted">Cảm ơn <strong><?php echo htmlspecialchars($_POST['ten_khach']); ?></strong>.</p>
-            <p>Đơn đặt phòng của bạn đã được ghi nhận.</p>
+            <p>Đơn đặt <strong><?php echo $soLuong; ?> phòng</strong> của bạn đang chờ xác nhận.</p>
+            <p>Nhân viên sẽ liên hệ sớm nhất qua số: <strong><?php echo htmlspecialchars($_POST['sdt_khach']); ?></strong></p>
             <a href="index.php" class="btn btn-primary" style="margin-top:20px;">Về trang chủ</a>
         </div>
     
@@ -144,8 +130,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="summary-box">
                     <h3 class="summary-title">Tóm tắt yêu cầu</h3>
                     <img src="<?php echo $nguonAnh; ?>" class="summary-thumb">
-                    <p style="margin-bottom: 10px; font-size: 1.1rem;"><strong>Phòng:</strong> <?php echo $phongInfo['ten_loai']; ?></p>
+                    <p style="margin-bottom: 10px; font-size: 1.1rem;"><strong>Loại phòng:</strong> <?php echo $phongInfo['ten_loai']; ?></p>
                     <hr class="divider">
+                    <div class="summary-row">
+                        <span>Số lượng:</span>
+                        <strong><?php echo $soLuong; ?> phòng</strong>
+                    </div>
                     <div class="summary-row">
                         <span>Ngày nhận:</span>
                         <strong><?php echo date('d/m/Y', strtotime($ngayNhan)); ?></strong>
