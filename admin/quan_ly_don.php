@@ -59,32 +59,68 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
         // --- DUYỆT ĐƠN (GIỮ CHỖ) ---
         if ($action == 'duyet_giu_cho') {
             
-            // Tìm N phòng trống để gán
-            $arrPhongDeGan = [];
-            $sqlTim = "SELECT id FROM phong 
-                       WHERE loai_phong_id = $idLoaiPhong 
-                       AND trang_thai = 'Sẵn sàng' 
-                       LIMIT $soLuongCan";
-            $resTim = $ketNoiDb->query($sqlTim);
+            // Lấy ngày nhận/trả của đơn đang duyệt
+            $startB = $order['ngay_nhan'];
+            $endB = $order['ngay_tra'];
+
+            // 1. Lấy tất cả các phòng thuộc loại này (Bất kể trạng thái là gì)
+            $sqlAllRooms = "SELECT id FROM phong WHERE loai_phong_id = $idLoaiPhong";
+            $resAllRooms = $ketNoiDb->query($sqlAllRooms);
             
-            if ($resTim->num_rows < $soLuongCan) {
-                echo "<script>alert('Không đủ phòng trống để duyệt!'); window.location.href='quan_ly_don.php';</script>";
+            $phongTrong = []; // Mảng chứa ID các phòng thỏa mãn điều kiện
+
+            while($rRoom = $resAllRooms->fetch_assoc()) {
+                $pid = $rRoom['id'];
+                
+                // 2. Kiểm tra phòng này có bị trùng lịch với đơn nào ĐÃ DUYỆT hoặc ĐANG Ở không?
+                // Điều kiện trùng: (StartA < EndB) AND (EndA > StartB)
+                // Ta tìm xem có đơn nào trùng không. Nếu COUNT = 0 nghĩa là Trống.
+                
+                $sqlCheckConflict = "SELECT COUNT(*) as cnt 
+                                     FROM chi_tiet_dat_phong ct
+                                     JOIN dat_phong dp ON ct.dat_phong_id = dp.id
+                                     WHERE ct.phong_id = $pid
+                                     AND dp.trang_thai IN ('Đã duyệt', 'Đang ở') 
+                                     AND dp.id != $id  -- Trừ chính đơn này ra
+                                     AND (dp.ngay_nhan < '$endB' AND dp.ngay_tra > '$startB')";
+                
+                $isBusy = $ketNoiDb->query($sqlCheckConflict)->fetch_assoc()['cnt'];
+                
+                if ($isBusy == 0) {
+                    $phongTrong[] = $pid; // Phòng này rảnh trong khoảng thời gian đó
+                }
+            }
+
+            // 3. Kiểm tra đủ số lượng không
+            if (count($phongTrong) < $soLuongCan) {
+                echo "<script>alert('Không đủ phòng trống trong khoảng thời gian từ $startB đến $endB! (Chỉ còn " . count($phongTrong) . " phòng).'); window.location.href='quan_ly_don.php';</script>";
                 exit;
             }
 
-            // Bắt đầu gán phòng
-            while($r = $resTim->fetch_assoc()) {
-                $pid = $r['id'];
-                // 1. Thêm vào bảng chi tiết
+            // 4. Duyệt đơn và Gán phòng
+            // Lấy N phòng đầu tiên trong danh sách tìm được
+            for ($i = 0; $i < $soLuongCan; $i++) {
+                $pid = $phongTrong[$i];
                 $ketNoiDb->query("INSERT INTO chi_tiet_dat_phong (dat_phong_id, phong_id) VALUES ($id, $pid)");
-                // 2. Đổi trạng thái phòng -> Đã đặt
-                $ketNoiDb->query("UPDATE phong SET trang_thai = 'Đã đặt' WHERE id = $pid");
+                
+                // Cập nhật trạng thái phòng:
+                // Lưu ý: Chỉ chuyển sang 'Đã đặt' nếu ngày nhận là TƯƠNG LAI.
+                // Nếu ngày nhận là HÔM NAY thì coi như giữ chỗ ngay.
+                // Tuy nhiên để đơn giản hiển thị, ta cứ set 'Đã đặt'. 
+                // Nhưng cẩn thận: Nếu phòng đó đang có người ở (đơn khác chưa out), ta không nên đổi trạng thái phòng ngay.
+                // => Tốt nhất là KHÔNG update bảng 'phong' ở bước này, mà chỉ dựa vào bảng 'dat_phong' để biết lịch.
+                // Hoặc update nếu phòng đó đang 'Sẵn sàng'.
+                
+                $checkStt = $ketNoiDb->query("SELECT trang_thai FROM phong WHERE id=$pid")->fetch_assoc()['trang_thai'];
+                if ($checkStt == 'Sẵn sàng') {
+                    $ketNoiDb->query("UPDATE phong SET trang_thai = 'Đã đặt' WHERE id = $pid");
+                }
             }
-            
-            // 3. Update đơn
+
             $ketNoiDb->query("UPDATE dat_phong SET trang_thai = 'Đã duyệt' WHERE id = $id");
-            echo "<script>alert('Đã duyệt và giữ chỗ thành công!'); window.location.href='quan_ly_don.php';</script>";
-        } 
+
+            echo "<script>alert('Duyệt thành công! Đã xếp lịch cho các phòng: " . implode(', ', array_slice($phongTrong, 0, $soLuongCan)) . "'); window.location.href='quan_ly_don.php';</script>";
+        }
 
         // --- CHECK-IN ---
         elseif ($action == 'check_in') {

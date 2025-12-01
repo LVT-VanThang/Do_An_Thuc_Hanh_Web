@@ -43,13 +43,18 @@ $trangHienTai = basename($_SERVER['PHP_SELF']);
                 <nav class="admin-menu">
                     <ul>
                         <li>
+                             <a href="so_do_phong.php" class="...">
+                                 <i class="fas fa-home"></i> <span>TimeLine Phòng</span>
+                             </a>
+                      </li>
+                        <li>
                             <a href="quan_ly_don.php" class="<?php echo ($trangHienTai == 'quan_ly_don.php') ? 'active' : ''; ?>">
                                 <i class="fas fa-file-invoice-dollar"></i> <span>Đơn Hàng</span>
                             </a>
                         </li>
                         <li>
                             <a href="quan_ly_phong.php" class="<?php echo ($trangHienTai == 'quan_ly_phong.php') ? 'active' : ''; ?>">
-                                <i class="fas fa-door-open"></i> <span>Phòng & Giá</span>
+                                <i class="fa-solid fa-coins"></i> <span> Loại Phòng & Giá</span>
                             </a>
                         </li>
                         <li>
@@ -59,23 +64,21 @@ $trangHienTai = basename($_SERVER['PHP_SELF']);
                         </li>
                         <li>
                              <a href="quan_ly_so_phong.php" class="...">
-                                 <i class="fas fa-th-list"></i> <span>Quản lý Số phòng</span>
+                                 <i class="fas fa-th-list"></i> <span>Quản lý Phòng</span>
                              </a>
                       </li>
                       <li>
                              <a href="danh_sach_dang_o.php" class="...">
-                                 <i class="fas fa-home"></i> <span>Trả phòng</span>
+                                 <i class="fas fa-door-open"></i> <span>Trả phòng</span>
                              </a>
                       </li>
+                      
                     </ul>
                 </nav>
 
                 <div class="admin-profile">
                     
-                    <div class="profile-info">
-                        <img src="https://ui-avatars.com/api/?name=<?php echo $_SESSION['admin_user']; ?>&background=random&color=fff" alt="Avatar">
-                        <span class="user-name"><?php echo $_SESSION['admin_user']; ?></span>
-                    </div>
+                   
 
                     <a href="logout.php" class="btn-logout" title="Đăng xuất">
                         <i class="fas fa-sign-out-alt"></i>

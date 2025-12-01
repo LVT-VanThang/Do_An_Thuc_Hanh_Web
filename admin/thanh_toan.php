@@ -41,22 +41,42 @@ $giaPhong = $donData['gia_tien'];
 $soLuong = (int)$donData['so_luong']; 
 $tongTien = $giaPhong * $soNgayO * $soLuong;
 
-// --- XỬ LÝ POST (THANH TOÁN) ---
+// --- XỬ LÝ KHI BẤM NÚT "XÁC NHẬN THANH TOÁN" ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $tongTienFinal = $_POST['tong_tien'];
+    $idLoaiPhong = $_POST['loai_phong_id']; // Cần đảm bảo form có gửi cái này
     $ngayTraThucTe = date('Y-m-d H:i:s');
 
-    // 1. Trả tất cả các phòng của đơn này về 'Sẵn sàng'
-    // Lấy danh sách phòng từ bảng chi tiết
+    // 1. Lấy danh sách các phòng của đơn này từ bảng chi tiết
     $sqlGetRooms = "SELECT phong_id FROM chi_tiet_dat_phong WHERE dat_phong_id = $idDon";
     $resRooms = $ketNoiDb->query($sqlGetRooms);
     
     while($r = $resRooms->fetch_assoc()){
         $pid = $r['phong_id'];
-        $ketNoiDb->query("UPDATE phong SET trang_thai = 'Sẵn sàng' WHERE id = $pid");
+        
+        // --- LOGIC THÔNG MINH: KIỂM TRA TƯƠNG LAI ---
+        // Kiểm tra xem phòng này có đơn nào "Đã duyệt" (Booking) trong tương lai gần không?
+        // (Ví dụ: Có đơn nào nhận phòng từ ngày mai hoặc hôm nay không?)
+        
+        $sqlCheckFuture = "SELECT COUNT(*) as cnt 
+                           FROM chi_tiet_dat_phong ct
+                           JOIN dat_phong dp ON ct.dat_phong_id = dp.id
+                           WHERE ct.phong_id = $pid 
+                           AND dp.trang_thai = 'Đã duyệt'
+                           AND dp.ngay_nhan >= CURDATE()"; // Tìm các đơn sắp tới
+                           
+        $isBookedFuture = $ketNoiDb->query($sqlCheckFuture)->fetch_assoc()['cnt'];
+        
+        if ($isBookedFuture > 0) {
+            // Nếu có người đặt -> Chuyển về trạng thái 'Đã đặt'
+            $ketNoiDb->query("UPDATE phong SET trang_thai = 'Đã đặt' WHERE id = $pid");
+        } else {
+            // Nếu không ai đặt -> Chuyển về 'Sẵn sàng'
+            $ketNoiDb->query("UPDATE phong SET trang_thai = 'Sẵn sàng' WHERE id = $pid");
+        }
     }
 
-    // 2. Cập nhật trạng thái đơn hàng -> 'Đã trả'
+    // 2. Cập nhật trạng thái đơn hàng hiện tại -> 'Đã trả'
     $sqlDon = "UPDATE dat_phong 
                SET tong_tien = '$tongTienFinal', 
                    ngay_tra_thuc_te = '$ngayTraThucTe', 
@@ -65,11 +85,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     $ketNoiDb->query($sqlDon);
 
-    // 3. (Tùy chọn) Xóa chi tiết phòng để dọn dẹp sau khi trả
-    // $ketNoiDb->query("DELETE FROM chi_tiet_dat_phong WHERE dat_phong_id = $idDon");
+    // 3. Xóa chi tiết của đơn ĐÃ TRẢ để giải phóng dữ liệu
+    // (Lưu ý: Nếu bạn muốn giữ lịch sử xem đơn cũ ở phòng nào thì ĐỪNG xóa dòng này.
+    // Nhưng nếu không xóa, các câu query check trùng lịch phải thêm điều kiện loại trừ đơn 'Đã trả' ra.
+    // Để an toàn và dễ nhất hiện tại: Ta xóa liên kết trong bảng chi tiết sau khi trả phòng).
+    
+    $ketNoiDb->query("DELETE FROM chi_tiet_dat_phong WHERE dat_phong_id = $idDon");
 
     echo "<script>
-            alert('Thanh toán thành công! Đã trả $soLuong phòng về trạng thái Sẵn sàng.'); 
+            alert('Trả phòng thành công!'); 
             window.location.href='danh_sach_dang_o.php';
           </script>";
     exit;
