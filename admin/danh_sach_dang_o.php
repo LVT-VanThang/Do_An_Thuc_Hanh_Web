@@ -31,8 +31,8 @@ include __DIR__ . '/../includes/headeradmin.php';
             </thead>
             <tbody>
                 <?php
-                // SQL MỚI: Lấy dữ liệu từ bảng chi tiết
-                // Sử dụng GROUP_CONCAT để gom tất cả số phòng vào 1 dòng
+                // 1. Lấy danh sách các đơn hàng đang ở trạng thái 'Đang ở'
+                // Bỏ JOIN phong ở đây vì 1 đơn có nhiều phòng
                 $sql = "SELECT dp.id as id_don, 
                                dp.ten_khach, 
                                dp.sdt_khach, 
@@ -40,14 +40,10 @@ include __DIR__ . '/../includes/headeradmin.php';
                                dp.ngay_tra,
                                dp.so_luong,
                                lp.ten_loai,
-                               lp.gia_tien,
-                               GROUP_CONCAT(p.so_phong ORDER BY p.so_phong ASC SEPARATOR ', ') as danh_sach_phong
+                               lp.gia_tien
                         FROM dat_phong dp
                         JOIN loai_phong lp ON dp.loai_phong_id = lp.id
-                        LEFT JOIN chi_tiet_dat_phong ct ON dp.id = ct.dat_phong_id
-                        LEFT JOIN phong p ON ct.phong_id = p.id
                         WHERE dp.trang_thai = 'Đang ở'
-                        GROUP BY dp.id
                         ORDER BY dp.ngay_nhan ASC";
                 
                 $result = $ketNoiDb->query($sql);
@@ -56,16 +52,26 @@ include __DIR__ . '/../includes/headeradmin.php';
                     while ($row = $result->fetch_assoc()) {
                         $ngayNhan = date('d/m/Y', strtotime($row['ngay_nhan']));
                         $ngayTra = date('d/m/Y', strtotime($row['ngay_tra']));
-                        $soLuong = $row['so_luong'];
+                        $idDon = $row['id_don'];
                         
-                        // Tách chuỗi danh sách phòng thành mảng để hiển thị đẹp
-                        $phongs = explode(', ', $row['danh_sach_phong']);
+                        // 2. SUB-QUERY: Tìm danh sách các phòng cụ thể của đơn này
+                        // Lấy từ bảng chi_tiet_dat_phong
+                        $sqlPhong = "SELECT p.so_phong FROM chi_tiet_dat_phong ct 
+                                     JOIN phong p ON ct.phong_id = p.id 
+                                     WHERE ct.dat_phong_id = $idDon
+                                     ORDER BY p.so_phong ASC";
+                        $resPhong = $ketNoiDb->query($sqlPhong);
+                        
+                        $dsPhong = [];
+                        while($rP = $resPhong->fetch_assoc()) {
+                            $dsPhong[] = $rP['so_phong'];
+                        }
                         ?>
                         
                         <tr style="border-bottom: 1px solid #eee; transition: background 0.2s;">
                             
                             <td style="padding:15px; font-weight:bold; color:#7f8c8d;">
-                                #<?php echo $row['id_don']; ?>
+                                #<?php echo $idDon; ?>
                             </td>
 
                             <td style="padding:15px;">
@@ -80,18 +86,18 @@ include __DIR__ . '/../includes/headeradmin.php';
                             <td style="padding:15px;">
                                 <div style="color:#2980b9; font-weight:600; margin-bottom:8px;">
                                     <?php echo $row['ten_loai']; ?>
-                                    <span class="badge" style="background:#eee; color:#555; padding:2px 6px; border-radius:4px; font-size:0.8em;">SL: <?php echo $soLuong; ?></span>
+                                    <span class="badge" style="background:#eee; color:#555; padding:2px 6px; border-radius:4px; font-size:0.8em;">SL: <?php echo $row['so_luong']; ?></span>
                                 </div>
                                 
                                 <div style="display:flex; flex-wrap:wrap; gap:5px;">
-                                    <?php if (!empty($row['danh_sach_phong'])): ?>
-                                        <?php foreach($phongs as $p): ?>
-                                            <span style="background:#e0f2f1; color:#00695c; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.9em; border:1px solid #b2dfdb;">
+                                    <?php if (count($dsPhong) > 0): ?>
+                                        <?php foreach($dsPhong as $p): ?>
+                                            <span class="badge" style="background:#d1fae5; color:#065f46; border:1px solid #a7f3d0; padding:4px 8px; font-size:0.9em; border-radius:4px;">
                                                 <i class="fas fa-key" style="font-size:0.8em"></i> P.<?php echo $p; ?>
                                             </span>
                                         <?php endforeach; ?>
                                     <?php else: ?>
-                                        <span style="color:#999; font-style:italic;">Chưa xếp phòng</span>
+                                        <span style="color:#999; font-style:italic;">Chưa xếp phòng (Lỗi dữ liệu)</span>
                                     <?php endif; ?>
                                 </div>
                             </td>
@@ -110,7 +116,7 @@ include __DIR__ . '/../includes/headeradmin.php';
                             </td>
                             
                             <td style="padding:15px; text-align:center;">
-                                <a href="thanh_toan.php?id_don=<?php echo $row['id_don']; ?>" 
+                                <a href="thanh_toan.php?id_don=<?php echo $idDon; ?>" 
                                    class="btn-action"
                                    style="display:inline-block; background:#e74c3c; color:white; padding:8px 15px; border-radius:4px; text-decoration:none; font-weight:500; font-size:0.9em; box-shadow:0 2px 4px rgba(231,76,60,0.3); transition:0.2s;"
                                    onmouseover="this.style.background='#c0392b'"
@@ -131,7 +137,6 @@ include __DIR__ . '/../includes/headeradmin.php';
                                 <i class="fas fa-bed" style="font-size:3em;"></i>
                             </div>
                             <h4 style="color:#7f8c8d; margin:0;">Hiện không có khách nào đang lưu trú</h4>
-                            <p style="color:#95a5a6; font-size:0.9em;">Các đơn đặt phòng mới sẽ xuất hiện tại đây sau khi Check-in.</p>
                         </td>
                     </tr>
                     <?php

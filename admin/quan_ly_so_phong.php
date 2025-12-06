@@ -80,7 +80,7 @@ $result = $ketNoiDb->query($sql);
         // --- THÊM ĐOẠN NÀY ---
         if($row['trang_thai'] == 'Đã đặt') { 
             $bg = "#3498db"; // Xanh dương (Blue)
-            $txt = "Đã đặt (Giữ)";
+            $txt = "Đã đặt";
         }
         // ---------------------
 

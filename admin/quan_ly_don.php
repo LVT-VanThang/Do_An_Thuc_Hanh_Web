@@ -17,7 +17,7 @@ date_default_timezone_set('Asia/Ho_Chi_Minh');
 
 // Tìm đơn quá hạn và trả phòng dựa trên bảng CHI TIẾT
 $sqlQuaHan = "SELECT id FROM dat_phong 
-              WHERE trang_thai = 'Đã duyệt' 
+              WHERE trang_thai = 'Đã đặt' 
               AND ngay_nhan < CURDATE()"; 
 
 $dsQuaHan = $ketNoiDb->query($sqlQuaHan);
@@ -117,7 +117,7 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
                 }
             }
 
-            $ketNoiDb->query("UPDATE dat_phong SET trang_thai = 'Đã duyệt' WHERE id = $id");
+            $ketNoiDb->query("UPDATE dat_phong SET trang_thai = 'Đã đặt' WHERE id = $id");
 
             echo "<script>alert('Duyệt thành công! Đã xếp lịch cho các phòng: " . implode(', ', array_slice($phongTrong, 0, $soLuongCan)) . "'); window.location.href='quan_ly_don.php';</script>";
         }
@@ -169,7 +169,7 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
 // 4. THỐNG KÊ
 $tongDon = $ketNoiDb->query("SELECT COUNT(*) as t FROM dat_phong")->fetch_assoc()['t'];
 $donCho = $ketNoiDb->query("SELECT COUNT(*) as t FROM dat_phong WHERE trang_thai = 'Chờ xác nhận'")->fetch_assoc()['t'];
-$donSapDen = $ketNoiDb->query("SELECT COUNT(*) as t FROM dat_phong WHERE trang_thai = 'Đã duyệt'")->fetch_assoc()['t'];
+$donSapDen = $ketNoiDb->query("SELECT COUNT(*) as t FROM dat_phong WHERE trang_thai = 'Đã đặt'")->fetch_assoc()['t'];
 
 // 5. LẤY DANH SÁCH HIỂN THỊ
 $sql = "SELECT dp.*, lp.ten_loai 
@@ -264,7 +264,7 @@ $result = $ketNoiDb->query($sql);
                                         
                                         if ($st == 'Chờ xác nhận') 
                                             echo '<span class="badge" style="background:#f1c40f; color:white; padding:5px 10px; border-radius:4px;">Chờ duyệt</span>';
-                                        elseif ($st == 'Đã duyệt') 
+                                        elseif ($st == 'Đã đặt') 
                                             echo '<span class="badge" style="background:#3498db; color:white; padding:5px 10px; border-radius:4px;">Đã đặt (Giữ)</span>';
                                         elseif ($st == 'Đang ở') 
                                             echo '<span class="badge" style="background:#e74c3c; color:white; padding:5px 10px; border-radius:4px;">Đang ở</span>';
@@ -291,7 +291,7 @@ $result = $ketNoiDb->query($sql);
                                             </a>
                                         <?php endif; ?>
 
-                                        <?php if ($st == 'Đã duyệt'): ?>
+                                        <?php if ($st == 'Đã đặt'): ?>
                                             <a href="quan_ly_don.php?action=check_in&id=<?php echo $row['id']; ?>" class="action-btn" title="Khách đến nhận phòng" onclick="return confirm('Khách đã đến?')" style="background:#3498db; color:white; padding:6px 10px; border-radius:4px;">
                                                 <i class="fas fa-key"></i>
                                             </a>

@@ -42,7 +42,7 @@ if (!empty($phong['anh_dai_dien'])) {
 }
 
 // --- LẤY NGÀY HIỆN TẠI ĐỂ CHẶN LỊCH ---
-$ngayHienTai = date('Y-m-d');
+$ngayHienTai = date('Y-m-d');   
 ?>
 
 <main class="container page-padding">

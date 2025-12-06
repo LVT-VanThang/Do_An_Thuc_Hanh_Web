@@ -1,78 +1,89 @@
 <?php
 // File: admin/so_do_phong.php
 session_start();
-if (!isset($_SESSION['admin_logged_in'])) { header("Location: login.php"); exit; }
+if (!isset($_SESSION['admin_logged_in'])) { 
+    header("Location: login.php"); 
+    exit; 
+}
 include '../includes/ketnoidb.php';
 include '../includes/headeradmin.php';
 
 // =================================================================================
-// 1. CẤU HÌNH THỜI GIAN (HIỂN THỊ 14 NGÀY)
+// 1. CẤU HÌNH THỜI GIAN TIMELINE (14 NGÀY)
 // =================================================================================
 $soNgayHienThi = 14;
-$homNay = date('Y-m-d');
-$ngayBatDau = $homNay; 
+$homNay = date('Y-m-d'); // Lấy ngày hiện tại
+
+// Tạo danh sách các ngày cần hiển thị
 $dsNgay = [];
 for ($i = 0; $i < $soNgayHienThi; $i++) {
-    $dsNgay[] = date('Y-m-d', strtotime($ngayBatDau . " + $i days"));
+    $dsNgay[] = date('Y-m-d', strtotime($homNay . " + $i days"));
 }
+
+// Xác định phạm vi ngày để truy vấn SQL (Tối ưu hiệu suất)
+$ngayBatDau = $dsNgay[0];
 $ngayKetThuc = end($dsNgay);
 
 // =================================================================================
-// 2. XỬ LÝ BỘ LỌC TÌM KIẾM
+// 2. XỬ LÝ BỘ LỌC
 // =================================================================================
 $keyword = isset($_GET['keyword']) ? trim($_GET['keyword']) : '';
 $filterLoai = isset($_GET['loai_phong_id']) ? (int)$_GET['loai_phong_id'] : 0;
 
-// Tạo điều kiện lọc cho danh sách phòng
-$whereClause = "WHERE 1=1"; 
+// Điều kiện lọc cho danh sách phòng
+$wherePhong = "WHERE 1=1"; 
 if ($keyword != '') {
-    $whereClause .= " AND p.so_phong LIKE '%$keyword%'";
+    $wherePhong .= " AND p.so_phong LIKE '%$keyword%'";
 }
 if ($filterLoai > 0) {
-    $whereClause .= " AND p.loai_phong_id = $filterLoai";
+    $wherePhong .= " AND p.loai_phong_id = $filterLoai";
 }
 
 // =================================================================================
-// 3. LẤY DANH SÁCH PHÒNG (TRỤC DỌC)
+// 3. TRUY VẤN DỮ LIỆU
 // =================================================================================
+
+// A. Lấy danh sách phòng (Trục dọc)
 $sqlPhong = "SELECT p.id, p.so_phong, p.trang_thai, lp.ten_loai 
              FROM phong p 
              JOIN loai_phong lp ON p.loai_phong_id = lp.id 
-             $whereClause
+             $wherePhong
              ORDER BY lp.ten_loai ASC, p.so_phong ASC";
 $resPhong = $ketNoiDb->query($sqlPhong);
 
-// =================================================================================
-// 4. LẤY DỮ LIỆU ĐẶT PHÒNG ĐỂ LẤP VÀO Ô (DATA MAPPING)
-// =================================================================================
-// Lấy từ bảng CHI TIẾT để đảm bảo chính xác từng phòng
+// B. Lấy dữ liệu đặt phòng (Data Mapping)
+// Logic: Lấy các đơn có khoảng thời gian GIAO NHAU với khoảng thời gian hiển thị
 $sqlBooking = "SELECT p.id as phong_id, dp.ngay_nhan, dp.ngay_tra, dp.ten_khach, dp.trang_thai 
                FROM dat_phong dp
                JOIN chi_tiet_dat_phong ct ON dp.id = ct.dat_phong_id
                JOIN phong p ON ct.phong_id = p.id
-               WHERE (dp.ngay_nhan <= '$ngayKetThuc' AND dp.ngay_tra >= '$ngayBatDau')
-               AND dp.trang_thai IN ('Đã duyệt', 'Đang ở')";
+               WHERE dp.trang_thai NOT IN ('Đã hủy', 'Đã trả', 'Hủy do vắng mặt') 
+               AND (dp.ngay_nhan <= '$ngayKetThuc' AND dp.ngay_tra >= '$ngayBatDau')";
 
 $resBooking = $ketNoiDb->query($sqlBooking);
 
-// Chuyển dữ liệu vào mảng 2 chiều: $dataMap[ID_PHONG][NGAY] = Thông tin
+// C. Xử lý Mapping dữ liệu vào mảng 2 chiều: $dataMap[ID_PHONG][NGAY]
 $dataMap = [];
-if ($resBooking) {
+if ($resBooking && $resBooking->num_rows > 0) {
     while ($row = $resBooking->fetch_assoc()) {
         $pid = $row['phong_id'];
-        // Tạo khoảng ngày từ NgayNhan đến NgayTra
-        $period = new DatePeriod(
-            new DateTime($row['ngay_nhan']), 
-            new DateInterval('P1D'), 
-            (new DateTime($row['ngay_tra']))->modify('+1 day')
-        );
+        
+        // Chuẩn hóa ngày để lặp (bỏ giờ phút)
+        $start = new DateTime(date('Y-m-d', strtotime($row['ngay_nhan'])));
+        $end   = new DateTime(date('Y-m-d', strtotime($row['ngay_tra'])));
+        $end->modify('+1 day'); // Cộng 1 ngày để DatePeriod lấy đủ ngày cuối
+
+        $period = new DatePeriod($start, new DateInterval('P1D'), $end);
         
         foreach ($period as $dt) {
-            $d = $dt->format('Y-m-d');
-            if (in_array($d, $dsNgay)) {
-                $dataMap[$pid][$d] = [
-                    'khach' => $row['ten_khach'], 
-                    'trang_thai' => $row['trang_thai']
+            $currentDate = $dt->format('Y-m-d');
+            
+            // Chỉ lưu nếu ngày nằm trong danh sách hiển thị
+            if (in_array($currentDate, $dsNgay)) {
+                // Lưu thông tin vào mảng
+                $dataMap[$pid][$currentDate] = [
+                    'khach'      => $row['ten_khach'], 
+                    'trang_thai' => $row['trang_thai'] 
                 ];
             }
         }
@@ -84,126 +95,88 @@ $listLoai = $ketNoiDb->query("SELECT * FROM loai_phong");
 ?>
 
 <style>
-    .timeline-wrapper {
-        max-height: 75vh; /* Chiều cao tối đa của bảng */
-        overflow: auto;   /* Bật thanh cuộn 2 chiều */
+    .timeline-container {
+        max-height: 75vh;
+        overflow: auto;
         background: white;
         border-radius: 8px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        border: 1px solid #ddd;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
         position: relative;
     }
-
     .tl-table {
         width: 100%;
-        border-collapse: separate; /* Bắt buộc cho sticky */
+        border-collapse: separate; 
         border-spacing: 0;
-        min-width: 1800px; /* Độ rộng tối thiểu để không bị co */
+        min-width: 1500px; /* Đảm bảo bảng không bị co nhỏ quá mức */
     }
-
     .tl-table th, .tl-table td {
         border-right: 1px solid #eee;
         border-bottom: 1px solid #eee;
-        padding: 8px;
+        padding: 5px;
         text-align: center;
-        font-size: 0.85rem;
+        height: 55px;
         box-sizing: border-box;
-        height: 60px; /* Chiều cao cố định cho ô */
+        vertical-align: middle;
     }
-
-    /* STICKY HEADER (NGÀY) */
-    .tl-table thead th {
-        position: sticky;
-        top: 0;
-        background: #f8f9fa;
-        z-index: 10;
-        box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
-        color: #555;
-    }
-
-    /* STICKY COLUMN (PHÒNG) */
-    .tl-table tbody th, .col-room-header {
-        position: sticky;
-        left: 0;
-        background: #fff;
-        z-index: 5;
-        border-right: 2px solid #ddd;
-        min-width: 100px;
-        max-width: 160px;
-        text-align: left !important;
-        padding-left: 15px !important;
-        box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1);
-    }
-
-    /* GIAO ĐIỂM (GÓC TRÁI TRÊN) */
-    .tl-table thead th:first-child {
-        position: sticky;
-        left: 0;
-        top: 0;
-        z-index: 20;
-        background: #2c3e50;
-        color: white;
-        border-right: 2px solid #ddd;
-    }
-
-    /* TRẠNG THÁI MÀU SẮC */
-    .status-booked { background-color: #3498db; color: white; border-radius: 4px; font-size: 0.8em; padding: 4px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: help; }
-    .status-active { background-color: #e74c3c; color: white; border-radius: 4px; font-size: 0.8em; padding: 4px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: help; }
     
-    .status-fixing { background-color: #f39c12; color: white; font-size: 0.8em; padding: 4px 8px; border-radius: 15px; font-weight: bold; display: inline-block; }
-    .status-cleaning { background-color: #9b59b6; color: white; font-size: 0.8em; padding: 4px 8px; border-radius: 15px; font-weight: bold; display: inline-block; }
+    /* Cố định cột tiêu đề và cột đầu tiên */
+    .tl-table thead th { position: sticky; top: 0; background: #f8f9fa; z-index: 10; box-shadow: 0 2px 2px rgba(0,0,0,0.05); }
+    .tl-table tbody th { position: sticky; left: 0; background: #fff; z-index: 5; border-right: 2px solid #ddd; min-width: 120px; text-align: left !important; padding-left: 15px; }
+    .tl-table thead th:first-child { position: sticky; left: 0; top: 0; z-index: 20; background: #2c3e50; color: white; }
 
-    .is-today { background-color: #fff8e1 !important; border-bottom: 3px solid #ffc107 !important; }
+    /* Định dạng ô trạng thái */
+    .cell-data {
+        display: flex; flex-direction: column; justify-content: center; align-items: center;
+        width: 100%; height: 100%;
+        border-radius: 4px; color: white; font-size: 0.8rem;
+        cursor: pointer; overflow: hidden;
+    }
     
-    .filter-bar { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
-    .form-control { padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; outline: none; }
-    .btn-search { background: #2c3e50; color: white; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; transition: 0.2s; }
-    .btn-search:hover { background: #34495e; }
+    /* Màu sắc trạng thái ĐƠN HÀNG */
+    .bg-booked { background-color: #3498db; } /* Xanh dương: Đã đặt */
+    .bg-active { background-color: #e74c3c; } /* Đỏ: Đang ở */
+    .bg-wait   { background-color: #f1c40f; color: #333; } /* Vàng: Chờ duyệt */
+    
+    /* Màu sắc trạng thái PHÒNG (Tĩnh) */
+    .badge-status { padding: 3px 8px; border-radius: 10px; font-size: 0.75rem; color: white; display: inline-block; }
+    .st-maintenance { background-color: #e67e22; } /* Bảo trì */
+    .st-cleaning    { background-color: #9b59b6; } /* Đang dọn */
+
+    .is-today { background-color: #fff8e1 !important; border-bottom: 3px solid #f1c40f !important; }
 </style>
 
 <main class="container page-padding">
     
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
         <h1 class="tieu-de-muc" style="margin:0;">Sơ Đồ Timeline Phòng</h1>
-        <div style="font-size:0.9em; color:#666;">Hôm nay: <b><?php echo date('d/m/Y'); ?></b></div>
+        <div style="color: #666;">Hôm nay: <strong><?php echo date('d/m/Y'); ?></strong></div>
     </div>
 
-    <form method="GET" class="filter-bar">
-        <div style="display:flex; align-items:center; gap:10px;">
-            <label>Số phòng:</label>
-            <input type="text" name="keyword" class="form-control" placeholder="Nhập số (VD: 101)" value="<?php echo htmlspecialchars($keyword); ?>">
-        </div>
-        
-        <div style="display:flex; align-items:center; gap:10px;">
-            <label>Loại phòng:</label>
-            <select name="loai_phong_id" class="form-control">
-                <option value="0">-- Tất cả --</option>
-                <?php while($lp = $listLoai->fetch_assoc()): ?>
-                    <option value="<?php echo $lp['id']; ?>" <?php if($filterLoai == $lp['id']) echo 'selected'; ?>>
-                        <?php echo $lp['ten_loai']; ?>
-                    </option>
-                <?php endwhile; ?>
-            </select>
-        </div>
-
-        <button type="submit" class="btn-search"><i class="fas fa-search"></i> Tìm kiếm</button>
-        
+    <form method="GET" style="background:white; padding:15px; border-radius:8px; margin-bottom:20px; display:flex; gap:10px; align-items:center; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+        <input type="text" name="keyword" placeholder="Nhập số phòng..." value="<?php echo htmlspecialchars($keyword); ?>" style="padding:8px; border:1px solid #ddd; border-radius:4px;">
+        <select name="loai_phong_id" style="padding:8px; border:1px solid #ddd; border-radius:4px;">
+            <option value="0">-- Tất cả loại --</option>
+            <?php while($lp = $listLoai->fetch_assoc()): ?>
+                <option value="<?php echo $lp['id']; ?>" <?php if($filterLoai == $lp['id']) echo 'selected'; ?>>
+                    <?php echo $lp['ten_loai']; ?>
+                </option>
+            <?php endwhile; ?>
+        </select>
+        <button type="submit" class="btn-big-cta" style="padding:8px 15px; font-size:0.9rem;">Xem sơ đồ</button>
         <?php if($keyword || $filterLoai): ?>
-            <a href="so_do_phong.php" style="color:#e74c3c; text-decoration:underline; font-size:0.9em; margin-left:10px;">Xóa lọc</a>
+            <a href="so_do_phong.php" style="color:red; margin-left:10px;">Xóa lọc</a>
         <?php endif; ?>
     </form>
 
-    <div class="timeline-wrapper">
+    <div class="timeline-container">
         <table class="tl-table">
             <thead>
                 <tr>
-                    <th class="col-room-header">PHÒNG / NGÀY</th>
+                    <th style="width: 150px;">PHÒNG / NGÀY</th>
                     <?php foreach ($dsNgay as $ngay): ?>
                         <th class="<?php echo ($ngay == $homNay) ? 'is-today' : ''; ?>">
-                            <?php 
-                                echo date('d/m', strtotime($ngay)); 
-                                echo "<br><span style='font-size:0.8em; font-weight:normal; color:#666;'>" . date('D', strtotime($ngay)) . "</span>";
-                            ?>
+                            <?php echo date('d/m', strtotime($ngay)); ?><br>
+                            <small style="font-weight:normal; color:#555;"><?php echo date('D', strtotime($ngay)); ?></small>
                         </th>
                     <?php endforeach; ?>
                 </tr>
@@ -212,33 +185,41 @@ $listLoai = $ketNoiDb->query("SELECT * FROM loai_phong");
                 <?php if($resPhong->num_rows > 0): ?>
                     <?php while ($p = $resPhong->fetch_assoc()): ?>
                         <tr>
-                            <th class="col-room-header">
-                                <strong style="font-size:1.1em; color:#2c3e50;">P.<?php echo $p['so_phong']; ?></strong><br>
-                                <span style="font-size:0.75em; color:#7f8c8d; font-weight:normal;"><?php echo $p['ten_loai']; ?></span>
+                            <th>
+                                <div style="font-weight:bold; color:#2c3e50; font-size:1.1rem;">P.<?php echo $p['so_phong']; ?></div>
+                                <div style="font-size:0.8rem; color:#7f8c8d; font-weight:normal;"><?php echo $p['ten_loai']; ?></div>
                             </th>
 
                             <?php foreach ($dsNgay as $ngay): ?>
                                 <td class="<?php echo ($ngay == $homNay) ? 'is-today' : ''; ?>">
                                     <?php
-                                        // 1. ƯU TIÊN: HIỂN THỊ ĐẶT PHÒNG (Khách)
+                                        // 1. ƯU TIÊN HIỂN THỊ ĐƠN ĐẶT PHÒNG
                                         if (isset($dataMap[$p['id']][$ngay])) {
                                             $info = $dataMap[$p['id']][$ngay];
-                                            // Phân biệt màu sắc
-                                            $class = ($info['trang_thai'] == 'Đang ở') ? 'status-active' : 'status-booked';
-                                            // Hiển thị tên khách
-                                            echo "<span class='$class' title='{$info['khach']}'>{$info['khach']}</span>";
-                                        } 
-                                        
-                                        // 2. NẾU TRỐNG & LÀ HÔM NAY: HIỂN THỊ TRẠNG THÁI PHÒNG (Bảo trì/Dọn)
-                                        else if ($ngay == $homNay) {
-                                            // Lấy trạng thái thực tế từ bảng phong
-                                            if ($p['trang_thai'] == 'Bảo trì') {
-                                                echo "<span class='status-fixing'><i class='fas fa-tools'></i> Bảo trì</span>";
-                                            } 
-                                            elseif ($p['trang_thai'] == 'Đang dọn') {
-                                                echo "<span class='status-cleaning'><i class='fas fa-broom'></i> Dọn</span>";
+                                            $tt   = $info['trang_thai'];
+                                            
+                                            // Xác định màu sắc dựa trên trạng thái đơn
+                                            $cssClass = 'bg-booked'; // Mặc định xanh
+                                            if (stripos($tt, 'ở') !== false || stripos($tt, 'check-in') !== false) {
+                                                $cssClass = 'bg-active'; // Đỏ
+                                            } elseif (stripos($tt, 'chờ') !== false) {
+                                                $cssClass = 'bg-wait'; // Vàng
                                             }
-                                            // Sẵn sàng thì để trống cho thoáng
+
+                                            echo "<div class='cell-data $cssClass' title='Trạng thái: $tt'>";
+                                            echo "<span>" . $info['khach'] . "</span>";
+                                            echo "</div>";
+                                        } 
+                                        // 2. NẾU KHÔNG CÓ ĐƠN -> HIỂN THỊ TRẠNG THÁI PHÒNG (Chỉ hiện ở cột Hôm nay hoặc tương lai gần)
+                                        elseif ($ngay == $homNay) {
+                                            // Kiểm tra trạng thái tĩnh từ bảng 'phong'
+                                            if ($p['trang_thai'] == 'Bảo trì') {
+                                                echo "<span class='badge-status st-maintenance'><i class='fas fa-tools'></i> Bảo trì</span>";
+                                            } elseif ($p['trang_thai'] == 'Đang dọn') {
+                                                echo "<span class='badge-status st-cleaning'><i class='fas fa-broom'></i> Dọn</span>";
+                                            } elseif ($p['trang_thai'] == 'Sẵn sàng') {
+                                                // Có thể để trống hoặc hiện dấu tích
+                                            }
                                         }
                                     ?>
                                 </td>
@@ -246,23 +227,17 @@ $listLoai = $ketNoiDb->query("SELECT * FROM loai_phong");
                         </tr>
                     <?php endwhile; ?>
                 <?php else: ?>
-                    <tr>
-                        <th class="col-room-header">-</th>
-                        <td colspan="<?php echo $soNgayHienThi; ?>" style="text-align:center; padding:50px; color:#999;">
-                            Không tìm thấy phòng nào phù hợp.
-                        </td>
-                    </tr>
+                    <tr><td colspan="<?php echo $soNgayHienThi + 1; ?>" style="padding:30px; color:#999;">Không tìm thấy phòng nào.</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
-    
-    <div style="margin-top:20px; display:flex; gap:25px; font-size:0.9em; justify-content:center; padding:10px; background:#f9f9f9; border-radius:5px;">
-        <div style="display:flex; align-items:center;"><span style="width:15px; height:15px; background:#3498db; margin-right:8px; border-radius:3px;"></span> Đã đặt (Giữ chỗ)</div>
-        <div style="display:flex; align-items:center;"><span style="width:15px; height:15px; background:#e74c3c; margin-right:8px; border-radius:3px;"></span> Đang ở (Có khách)</div>
-        <div style="display:flex; align-items:center;"><span style="width:15px; height:15px; background:#f39c12; margin-right:8px; border-radius:3px;"></span> Đang bảo trì</div>
-        <div style="display:flex; align-items:center;"><span style="width:15px; height:15px; background:#9b59b6; margin-right:8px; border-radius:3px;"></span> Đang dọn dẹp</div>
-        <div style="display:flex; align-items:center;"><span style="width:15px; height:15px; background:#fff8e1; border:1px solid #ffc107; margin-right:8px; border-radius:3px;"></span> Cột hôm nay</div>
+
+    <div style="margin-top:20px; display:flex; gap:20px; font-size:0.9rem; justify-content:center; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center;"><span style="width:15px; height:15px;" class="bg-booked"></span>&nbsp; Đã đặt (Giữ chỗ)</div>
+        <div style="display:flex; align-items:center;"><span style="width:15px; height:15px;" class="bg-active"></span>&nbsp; Đang ở (Check-in)</div>
+        <div style="display:flex; align-items:center;"><span style="width:15px; height:15px;" class="badge-status st-maintenance"></span>&nbsp; Phòng đang bảo trì</div>
+        <div style="display:flex; align-items:center;"><span style="width:15px; height:15px;" class="badge-status st-cleaning"></span>&nbsp; Phòng đang dọn</div>
     </div>
 
 </main>
